@@ -1,0 +1,292 @@
+---
+title: "rddj-template"
+subtitle: "My analysis"
+author: "My Name"
+date: "June 2017"
+output:
+  html_document:
+    code_folding: show
+    toc: yes
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+---
+
+
+```{r, echo=FALSE}
+# CONFIG
+user_name <- "mycid" # your Git username (only needed if
+# you want to deploy to GH pages)
+project_name <- "OC_L2_RasterExtract" # adapt!
+package_date <- "2017-06-01" # date of the CRAN snapshot that
+# the checkpoint package uses
+```
+
+## Notes
+
+This report was generated on `r Sys.time()`.
+
+...
+
+### R-Script & data
+
+The preprocessing and analysis of the data was conducted in the [R project for statistical computing](https://www.r-project.org/). The RMarkdown script used to generate this document and all the resulting data can be downloaded [under this link](http://`r user_name`.github.io/`r project_name`/rscript.zip). Through executing `main.Rmd`, the herein described process can be reproduced and this document can be generated. In the course of this, data from the folder `ìnput` will be processed and results will be written to `output`. 
+
+### GitHub
+
+The code for the herein described process can also be freely downloaded from [https://github.com/`r user_name`/`r project_name`](https://github.com/`r user_name`/`r project_name`). 
+
+The code for the project template may be found at [https://github.com/grssnbchr/rddj-template](https://github.com/grssnbchr/rddj-template). 
+
+##### Many thanks to Timo Grossenbacher @ (https://github.com/grssnbchr)
+for creating this extremely elegant and useful template
+...
+
+### Project Purpose
+This project was created to facilitate easy conversion of L2 netCDF rasters taken from NASA's OceanColor Website run by the Ocean Biology Processing Group (OBPG) at NASA's Goddard Space Flight Center (https://oceancolor.gsfc.nasa.gov/). Potential exists for others to easily adapt this script to handle L1 netCDF files as well or other large netCDF remote sensing files. The goals of the code are two-fold: 1. Convert many unprojected netCDF rasters to any raster file type in bulk. 2. Reproject and clip to the same study area many netCDF rasters with widely different swatch bounding boxes. An additional step has been to quickly visualize the results when necissary.  
+
+...
+### Data description of input files
+Input files are netCDF files downloaded from the Ocean Color website as L2 products. These products are processed variables such as seasurface temperature and chlorophyll which are dervived from imperical relationships between irradiance and the physical variables. The l2 product is conveniently defined here: https://oceancolor.gsfc.nasa.gov/products/
+netCDF files are structured to contain global attirbutes, band attributes and multiple bands. The metadata and file naming system is described here: https://oceancolor.gsfc.nasa.gov/docs/format/l2nc/
+Example data for running this script includes 3 files containing chlorophyll alpha concentrations with associated variables and 3 files containing sea surface temperature with associated variables. Both files correspond to three images the study area contains on a single day, December 28, 2016.
+
+### Data description of output files
+
+#### `NASA_proj_metaD`
+
+Contains essential metadata extracted from the netcdf file global atributes. The bands extracted and the output raster file name are appended in columns at the end of the table. The metadata descriptive document may be found at: FILL IN
+
+#### `Output Raster files`
+
+Output raster files are generated and named using user specification of the function OCnetCDF2Raster. Raster files will be bounded by the specified study area and in the specified projection. Raster will not be scaled and cell values will contain the original values from the extracted raster. During rasterization and reprojection cells with multiple values from the netcdf file are averaged. NASA netCDF files are unprojected and use the WGS1984 latlon coordinate system. Each cell is given a centroid coordinate. Each raster has a resolution of aproximately 1km. This project uses UTM_S18 for the projection. Cells without data are NA. Users have the option of extracting the flagging layer contained within the netcdf file. For convenience,  the flag values are described at the end of the document.
+
+#### `Output plots (optional)`
+
+Output plots can optionally be generated using the ExtractRaster or OCnetCDF2Raster function. Plots are saved as jpeg imaged and display the netCDF raster data in 10 discreet colored quantiles. The study area extent is also shown as a white polygon rectangle border. All points outside of the polygon are not included in the exported raster file but are shown here in the plot. Plots are titled by the date of the swath and saved with the same name as the original netcdf file included. 
+...
+
+## Preparations
+
+```{r, echo=FALSE}
+detach_all_packages <- function() {
+  basic_packages_blank <-  c("stats",
+                             "graphics",
+                             "grDevices",
+                             "utils",
+                             "datasets",
+                             "methods",
+                             "base")
+  basic_packages <- paste("package:", basic_packages_blank, sep = "")
+
+  package_list <- search()[
+    ifelse(unlist(gregexpr("package:", search())) == 1, TRUE, FALSE)]
+
+  package_list <- setdiff(package_list, basic_packages)
+
+  if (length(package_list) > 0)  for (package in package_list) {
+    detach(package, character.only = TRUE, unload = TRUE)
+    print(paste("package ", package, " detached", sep = ""))
+  }
+}
+
+detach_all_packages()
+
+# this allows multiple persons to use the same RMarkdown
+# without adjusting the working directory by themselves all the time
+source("scripts/csf.R")
+path_to_wd <- csf() # if this - for some reason - does not work, 
+# replace with a hardcoded path, like so: "~/projects/rddj-template/analysis/"
+if ( is.null(path_to_wd) | !dir.exists(path_to_wd)) {
+  print("WARNING: No working directory specified for current user")
+} else {
+  setwd(path_to_wd)
+}
+```
+
+
+### Define packages
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# from https://mran.revolutionanalytics.com/web/packages/checkpoint/vignettes/using-checkpoint-with-knitr.html
+# if you don't need a package, remove it from here (commenting is probably not sufficient)
+# tidyverse: see https://blog.rstudio.org/2016/09/15/tidyverse-1-0-0/
+cat("
+library(raster)
+library(ncdf4)
+library(ggmap)
+library(svMisc)
+library(RColorBrewer)
+library(tidyverse) # ggplot2, dplyr, tidyr, readr, purrr, tibble
+library(stringr) # string manipulation
+library(scales) # scales for ggplot2
+library(jsonlite) # json
+library(lintr) # code linting
+library(sp) # spatial data handling
+library(rgeos) # spatial data handling
+library(rgdal) # spatial data handling",
+file = "manifest.R")
+```
+
+### Install packages
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# if checkpoint is not yet installed, install it (for people using this
+# system for the first time)
+if (!require(checkpoint)) {
+  if (!require(devtools)) {
+    install.packages("devtools", repos = "http://cran.us.r-project.org")
+    require(devtools)
+  }
+  devtools::install_github("checkpoint",
+                           username = "RevolutionAnalytics",
+                           ref = "v0.3.2", # could be adapted later,
+                           # as of now (beginning of July 2017
+                           # this is the current release on CRAN)
+                           repos = "http://cran.us.r-project.org")
+  require(checkpoint)
+}
+# nolint start
+if (!dir.exists("~/.checkpoint")) {
+  dir.create("~/.checkpoint")
+}
+# nolint end
+# install packages for the specified CRAN snapshot date
+checkpoint(snapshotDate = package_date,
+           project = path_to_wd,
+           verbose = T,
+           scanForPackages = T,
+           use.knitr = F)
+rm(package_date)
+```
+
+
+### Load packages
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+source("manifest.R")
+unlink("manifest.R")
+sessionInfo()
+```
+
+### Load additional scripts
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# if you want to outsource logic to other script files, see README for 
+# further information
+knitr::read_chunk("scripts/my_script.R")
+source("scripts/my_script.R")
+my_function(5)
+```
+
+## Test if input data is present
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+paths <- list.dirs(path="input/")
+files <- list.files(path=paths, pattern = ".nc$", full.names = FALSE)
+if(length(files)==0){
+  message("input netCDF files are not present in the input folder")
+} else
+{
+  message(paste(length(files), "files are present"))
+}
+# the following file would be ignored by Git if saved into the ignore folder
+# see README for further information
+# write.csv2(x, "output/ignore/fgh.csv", row.names = F)
+```
+## Extract only metadata example
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Choose the band you wish to extract
+band <- "chlor_a"
+#name of netCDF file
+nCDF <- files[1]
+bnd <- paste("geophysical_data/", band, sep = "") # create full length band variable name
+md <- metaXtract(nCDF, band = bnd)
+print(md)
+``` 
+## Extract from single file and generate plot
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Set additional variables
+output.proj = "+init=epsg:5362"
+date = NetCDFdateT(y)
+plotname <- paste(band, date[1])
+#
+Rasta <- ExtractRaster(
+  nCDF,
+  band = band,
+  Noflags = FALSE,
+  output.proj = output.proj,
+  proj.Ext = proj.Ext,
+  makeplots = TRUE,
+  saveplots = TRUE,
+  plotname = plotname
+)
+``` 
+###Check output folder to verify results
+
+## Use wrapper function to extract from multiple files  
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Set stage for use of the netCDF2Raster function
+#exc <-c("E:/SST_Colour/2006/2015/requested_files_1 (19-03)/requested_files", "E:/SST_Colour/2006/Data/requested_files/OC"  )
+paths <- paths[paths!=exc]
+filesSST <-   list.files( pattern = "SST\\.x\\.nc$", full.names = TRUE)
+ #list
+Chlor <- "chlor_a"
+SST <- "sst" 
+proj.Ext <-
+  extent(250000,
+         xmax = 1200000,
+         ymin = 3700000,
+         ymax = 5500000)
+OCnetCDF2Raster(filesSST, makeMeta =TRUE, band=SST,output.proj=output.proj, output.extension = ".tif", proj.Ext=proj.Ext, saveplots=FALSE, makeplots = FALSE)
+
+``` 
+
+## Linting
+
+The code in this RMarkdown is listed with the [lintr package](https://github.com/jimhester/lintr), which is based on the  [tidyverse style guide](http://style.tidyverse.org/). 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+lintr::lint("main.Rmd")
+# if you have additional scripts and want them to be linted too, add them here
+lintr::lint("scripts/Extract_Rasterize.R")
+```
+## Flagging
+Flags and meaning
+long_name: Level-2 Processing Flags
+valid_min: NA
+valid_max: 2147483647
+flag_masks: 1
+flag_masks: 2
+flag_masks: 4
+flag_masks: 8
+flag_masks: 16
+flag_masks: 32
+flag_masks: 64
+flag_masks: 128
+flag_masks: 256
+flag_masks: 512
+flag_masks: 1024
+flag_masks: 2048
+flag_masks: 4096
+flag_masks: 8192
+flag_masks: 16384
+flag_masks: 32768
+flag_masks: 65536
+flag_masks: 131072
+flag_masks: 262144
+flag_masks: 524288
+flag_masks: 1048576
+flag_masks: 2097152
+flag_masks: 4194304
+flag_masks: 8388608
+flag_masks: 16777216
+flag_masks: 33554432
+flag_masks: 67108864
+flag_masks: 134217728
+flag_masks: 268435456
+flag_masks: 536870912
+flag_masks: 1073741824
+flag_masks: NA
+flag_meanings: ATMFAIL LAND PRODWARN HIGLINT HILT HISATZEN COASTZ SPARE STRAYLIGHT CLDICE COCCOLITH TURBIDW HISOLZEN SPARE LOWLW CHLFAIL NAVWARN ABSAER SPARE MAXAERITER MODGLINT CHLWARN ATMWARN SPARE SEAICE NAVFAIL FILTER SPARE BOWTIEDEL HIPOL PRODFAIL SPARE
