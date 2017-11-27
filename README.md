@@ -1,16 +1,15 @@
 # OC L2 netCDF Raster Extract
 
-This product allows the quick and streamlined processing of NASA L2 Ocean Color data into standard raster types and projects. It can work with single or many files and allows simple visualization of the data. Metadata may also be extracted and files can are customizably named and saved. This project was created for  the purpose of processing many years of netCDF raster data for the general region of Patagonia. It sets up rasters so that they may later be easily retrievable and processed into higher level data products. This code could be adapted to work with other types of spatial netCDF files. Thanks to the rddj-template (https://github.com/grssnbchr/rddj-template) it is also completely reproducible and deployable with minimal modification. 
+This product allows the quick and streamlined processing of NASA L2 Ocean Color data into standard raster types and projects. It can work with single or many files and allows simple visualization of the data. Metadata may also be extracted and files are customizably named and saved. This project was created for  the purpose of processing many years of netCDF raster data for the general region of Patagonia but may function for any study region of the world. It sets up rasters so that they may later be easily retrievable and processed into higher level data products. This code could be adapted to work with other types of spatial netCDF files. Thanks to the rddj-template (https://github.com/grssnbchr/rddj-template) it is also completely reproducible and deployable with minimal modification. 
 
 ## Getting Started
-
+```
 Clone and reset git repository.
-
 git clone https://github.com/mycid/rddj-template-TE-Raster-Extract.git
 cd rddj-template-TE-Raster-Extract
 rm -rf .git
 git init
-
+```
 Alternatively, download them repository from github.com and launch the markdown file
 
 ### Prerequisites
@@ -19,11 +18,13 @@ You will need R, R Studio, the package checkpoint and markdown 1.6. To deploy wi
 
 ### What you get
 
-Input, and output folders for data are provided and filled with dataproducts. Examine the input files to see how they may differ from yours and precede to the output products to see how they might differ from your desired result. Open the main.html file and read through the process. 
+Input, and output folders for data are provided and filled with dataproducts. Examine the input files to see how they may differ from your data and precede to the output products to see how they might differ from your desired result. Open the main.html file and read through the process. 
 
 ### Running the RMD
 
-The main.Rmd file will run and build an html file open knitting. No input is needed. To use the Rmd file as a tool simply add your own data to the input folder and replace function variables to match your desired output. 
+First note this Rmd is principally designed to be reproducible. It will download older versions of packages to achieve this result, a function that will not be strictly necissary given the methods involved. If you would like to avoid the use of checkpoint or other such measures just use the functions contained in the scripts. 
+
+The main.Rmd file will run and build an html file when knitted. No input is needed. To use the Rmd file as a tool simply add your own data to the input folder and replace function variables to match your desired output. 
 
 ### Using the scripts
 
