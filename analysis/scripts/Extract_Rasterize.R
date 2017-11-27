@@ -1,16 +1,4 @@
-#Part one: Data extraction
-#create list of files to be extracted
-#iteratively run through list with a function that repeats these steps:
-#Function will allow:
-#1. naming system for files, default will be raster type+remote sensing date of image
-#2. output format of raster
-#3. name of output metadata and location
 #_________________________________________________________________
-
-#Load required packages:
-
-l
-#
 #CUSTOM FUNCTIONS
 #' @title metaXtract
 #' @param x is the full file name a netCDF file
@@ -90,6 +78,7 @@ NetCDFdateT <- function(y) {
 #' @param saveplots logical allowing for plots to be saved. Plotting options must be modified within the function
 #' @param allows user to specify the title of the plot
 #' @param base allows wrapper function or user to input a ggplot object as the base map for plotting the raster over. Extent range of plot object must be contained in the base map. Saves computational time. 
+#' @param out allows user to specify the output file folder. out must end with a /. Default is nothing. 
 #' @return Returns a raster stack or raster layer file (package raster). plot files will also be saved as JPEG to the working directory
 #' @examples 
 #' get(testNASA)
@@ -107,7 +96,8 @@ ExtractRaster <-
            makeplots = TRUE,
            saveplots = TRUE,
            plotname = NA,
-           base=NA) {
+           base=NA,
+           out = "") {
     #Demand packages
     require(raster)
     require(RNetCDF)
@@ -119,7 +109,7 @@ ExtractRaster <-
     require(ggplot2)
     require(stringr)
     #Set variables
-    if(is.NA(str_ext(band, "/"))) { #Detects if band variable is abreviated or includes the prefix geophsical data. Adds prefix if needed
+    if(is.na(str_extract(band, "/"))) { #Detects if band variable is abreviated or includes the prefix geophsical data. Adds prefix if needed
     bnd <-
       paste("geophysical_data/", band, sep = "") #full length band variable name
     }else {
@@ -268,7 +258,7 @@ ExtractRaster <-
           ) +
           theme_bw() + #basic theme
           ggtitle(plotname) + #add plot title
-          + guides(fill=guide_legend(title=paste(band, "units")))+ #change legend title
+          guides(fill = guide_legend(title = paste(band, "units"))) + #change legend title
           theme( #set custom theme
             axis.title.x = element_text(size = 20),
             plot.title = element_text("bold", 28),
@@ -288,7 +278,7 @@ ExtractRaster <-
         datet <- NetCDFdateT(y) #Extract date
         suppressWarnings(
           ggsave(
-            filename = paste(y, "_", band, ".jpg", sep = ""),
+            filename = paste(out, y, "_", band, ".jpg", sep = ""),
             plot = PLOT,
             device = "jpeg",
             height = 35,
@@ -301,7 +291,7 @@ ExtractRaster <-
     return(Chlor)
   }
 
-#' @title 
+#' @title oc.netCDF.2raster
 #' @description 
 #' @details Troubleshooting: 
 #' if error message is:  Error in file(file, ifelse(append, "a", "w")) cannot open the connection, you have the metadata spreadsheet open when trying to run the program. Close the spreadsheet and run again.
@@ -323,7 +313,7 @@ ExtractRaster <-
 #' @return
 #' @author
 #' @examples
-OCnetCDF2Raster <-
+oc.netCDF.2raster <-
   function(dat,
            band,
            filename = NA,
@@ -335,7 +325,8 @@ OCnetCDF2Raster <-
            Noflags = FALSE,
            makeplots = FALSE,
            saveplots = FALSE,
-           makeMeta = TRUE) 
+           makeMeta = TRUE,
+           out = "" ) 
 {
     #X list of files to be processed.
     #Can be a single file.
@@ -367,7 +358,7 @@ OCnetCDF2Raster <-
     Start=proc.time()
     #Extract all metadata
     if (isTRUE(makeMeta)) {
-      if(is.NA(str_ext(band, "/"))) { #Detects if band variable is abreviated or includes the prefix geophsical data. Adds prefix if needed
+      if(is.na(str_extract(band, "/"))) { #Detects if band variable is abreviated or includes the prefix geophsical data. Adds prefix if needed
         bnd <-
           paste("geophysical_data/", band, sep = "") #full length band variable name
       }else {
@@ -391,7 +382,7 @@ OCnetCDF2Raster <-
           cat("Done!\n")
         }
       }
-      write.csv(metadat, meta.name) #save metadata for whole list
+      write.csv(metadat, paste(out, meta.name, sep = "")) #save metadata for whole list
     }
     #
     #Make the basemap for plotting
@@ -448,7 +439,7 @@ OCnetCDF2Raster <-
         #Save raster
         attr(Rasta, "attributes") <-
           metaXtract(y, band = band) #Add global attributes to file
-        writeRaster(Rasta, name, overwrite = TRUE)
+        writeRaster(Rasta, paste(out, name, sep=""), overwrite = TRUE)
       }
       if (i == length(dat) & length(error_list > 0)) {
         assign("error_list", error_list, envir = globalenv())
@@ -458,36 +449,3 @@ OCnetCDF2Raster <-
     }
     Start-proc.time()
   }
-
-#Set stage for use of the netCDF2Raster function
-setwd("K:/SST_Colour/2015/requested_files_1 (19-03)/requested_files")
-paths <- list.dirs(path="E:/SST_Colour")
-#exc <-c("E:/SST_Colour/2006/2015/requested_files_1 (19-03)/requested_files", "E:/SST_Colour/2006/Data/requested_files/OC"  )
-paths <- paths[paths!=exc]
-filesSST <-   list.files( pattern = "SST\\.x\\.nc$", full.names = TRUE)
-filesChlor <- list.files(pattern = "OC\\.x\\.nc$", full.names = FALSE) #list
-Chlor <- "chlor_a"
-SST <- "sst" 
-proj.Ext <-
-  extent(250000,
-         xmax = 1200000,
-         ymin = 3700000,
-         ymax = 5500000)
-OCnetCDF2Raster(filesSST, makeMeta =TRUE, band=SST,output.proj=output.proj, output.extension = ".tif", proj.Ext=proj.Ext, saveplots=FALSE, makeplots = FALSE)
-
-#Debugging
-#Testing out any single file
-y=filesSST[1]
-output.proj = "+init=epsg:5362"
-date = NetCDFdateT(y)
-plotname <- paste(band, date[1])
-Rasta <- ExtractRaster(
-  y,
-  band = band,
-  Noflags = FALSE,
-  output.proj,
-  proj.Ext = proj.Ext,
-  makeplots = makeplots,
-  saveplots = saveplots,
-  plotname = plotname
-)

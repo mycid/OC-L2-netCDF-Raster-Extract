@@ -1,15 +1,17 @@
 ---
-title: "rddj-template"
-subtitle: "My analysis"
-author: "My Name"
-date: "June 2017"
+title: "Ocean Color netCDF 2 Raster"
+author: "Trevor Eakes"
+date: "November 2017"
 output:
   html_document:
     code_folding: show
     toc: yes
-    toc_float: 
-      collapsed: false
-      smooth_scroll: false
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+  pdf_document:
+    toc: yes
+subtitle: My analysis
 ---
 
 
@@ -17,7 +19,7 @@ output:
 # CONFIG
 user_name <- "mycid" # your Git username (only needed if
 # you want to deploy to GH pages)
-project_name <- "OC_L2_RasterExtract" # adapt!
+project_name <- "rddj-template-TE-Raster-Extract" # adapt!
 package_date <- "2017-06-01" # date of the CRAN snapshot that
 # the checkpoint package uses
 ```
@@ -95,7 +97,7 @@ detach_all_packages()
 # this allows multiple persons to use the same RMarkdown
 # without adjusting the working directory by themselves all the time
 source("scripts/csf.R")
-path_to_wd <- csf() # if this - for some reason - does not work, 
+path_to_wd <- csf()# if this - for some reason - does not work, 
 # replace with a hardcoded path, like so: "~/projects/rddj-template/analysis/"
 if ( is.null(path_to_wd) | !dir.exists(path_to_wd)) {
   print("WARNING: No working directory specified for current user")
@@ -174,29 +176,23 @@ sessionInfo()
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
 # if you want to outsource logic to other script files, see README for 
 # further information
-knitr::read_chunk("scripts/my_script.R")
-source("scripts/my_script.R")
-my_function(5)
+knitr::read_chunk("scripts/Extract_Rasterize.R")
+source("scripts/Extract_Rasterize.R")
 ```
 
 ## Test if input data is present
-
-```{r, echo=TRUE, message=FALSE, warning=FALSE}
-paths <- list.dirs(path="input/")
-files <- list.files(path=paths, pattern = ".nc$", full.names = FALSE)
-if(length(files)==0){
+```{r, echo=TRUE, message=TRUE, warning=FALSE}
+paths <- list.dirs(path = "input/")
+files <- list.files(path = paths, pattern = ".nc$", full.names = TRUE)
+if (length(files) == 0){
   message("input netCDF files are not present in the input folder")
-} else
-{
+} else{
   message(paste(length(files), "files are present"))
 }
-# the following file would be ignored by Git if saved into the ignore folder
-# see README for further information
-# write.csv2(x, "output/ignore/fgh.csv", row.names = F)
 ```
 ## Extract only metadata example
-
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Set directory to output
 #Choose the band you wish to extract
 band <- "chlor_a"
 #name of netCDF file
@@ -208,39 +204,58 @@ print(md)
 ## Extract from single file and generate plot
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #Set additional variables
-output.proj = "+init=epsg:5362"
-date = NetCDFdateT(y)
+output.proj <- "+init=epsg:5362"
+date <- NetCDFdateT(nCDF)
 plotname <- paste(band, date[1])
+proj.ext <-
+  extent(250000,
+         xmax = 1200000,
+         ymin = 3700000,
+         ymax = 5500000)
 #
 Rasta <- ExtractRaster(
   nCDF,
   band = band,
   Noflags = FALSE,
   output.proj = output.proj,
-  proj.Ext = proj.Ext,
+  proj.Ext = proj.ext,
   makeplots = TRUE,
   saveplots = TRUE,
   plotname = plotname
 )
 ``` 
-###Check output folder to verify results
+####Check output folder to verify results
 
-## Use wrapper function to extract from multiple files  
+## Use wrapper function to extract netCDF rasters from multiple files  
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #Set stage for use of the netCDF2Raster function
-#exc <-c("E:/SST_Colour/2006/2015/requested_files_1 (19-03)/requested_files", "E:/SST_Colour/2006/Data/requested_files/OC"  )
-paths <- paths[paths!=exc]
-filesSST <-   list.files( pattern = "SST\\.x\\.nc$", full.names = TRUE)
+inn <- list.dirs(path = "input/")
+files.oc <- list.files(path = inn, pattern = "OC\\.x\\.nc$", full.names = TRUE)
+files.sst <-   list.files( pattern = "SST\\.x\\.nc$", full.names = TRUE)
  #list
-Chlor <- "chlor_a"
-SST <- "sst" 
-proj.Ext <-
+chlor <- "chlor_a"
+sst <- "sst"
+out <- "output/"
+proj.ext <-
   extent(250000,
          xmax = 1200000,
          ymin = 3700000,
          ymax = 5500000)
-OCnetCDF2Raster(filesSST, makeMeta =TRUE, band=SST,output.proj=output.proj, output.extension = ".tif", proj.Ext=proj.Ext, saveplots=FALSE, makeplots = FALSE)
+output.proj <- "+init=epsg:5362"
 
+oc.netCDF.2raster(files.oc,
+           chlor,
+           filename = NA,
+           output.extension = ".tiff",
+           output.proj = output.proj,
+           meta.name = "NASA_proj_metaD_Chlor.csv",
+           proj.Ext =proj.ext,
+           meta.exp = TRUE,
+           Noflags = FALSE,
+           makeplots = TRUE,
+           saveplots = FALSE,
+           makeMeta = TRUE,
+           out = out)
 ``` 
 
 ## Linting
@@ -249,8 +264,6 @@ The code in this RMarkdown is listed with the [lintr package](https://github.com
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 lintr::lint("main.Rmd")
-# if you have additional scripts and want them to be linted too, add them here
-lintr::lint("scripts/Extract_Rasterize.R")
 ```
 ## Flagging
 Flags and meaning
