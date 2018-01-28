@@ -231,10 +231,13 @@ Rasta <- ExtractRaster(
 #Set stage for use of the netCDF2Raster function
 inn <- list.dirs(path = "input/")
 files.oc <- list.files(path = inn, pattern = "OC\\.x\\.nc$", full.names = TRUE)
-files.sst <-   list.files( pattern = "SST\\.x\\.nc$", full.names = TRUE)
+files.sst <-list.files( path = inn, pattern = "SST\\.x\\.nc$", full.names = TRUE)
  #list
 chlor <- "chlor_a"
 sst <- "sst"
+k_490 <- "Kd_490"
+par <- "par"
+poc <- "poc"
 out <- "output/"
 proj.ext <-
   extent(250000,
